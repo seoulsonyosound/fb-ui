@@ -1,68 +1,65 @@
-const DEFAULT_BASE = '/api/posts';
-
-const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE)
-  ? `${import.meta.env.VITE_API_BASE.replace(/\/$/, '')}/api/posts`
-  : DEFAULT_BASE;
-
-function isHtml(text) {
-  return typeof text === 'string' && /^\s*<!doctype html>/i.test(text);
-}
+const BASE_URL = import.meta.env.VITE_API_BASE || '';
+const BASE = BASE_URL ? `${BASE_URL}/api/posts` : '/api/posts';
 
 async function handleResponse(res) {
-  const bodyText = await res.text();
-
   if (!res.ok) {
-    const message = isHtml(bodyText) ? `Server returned HTML (status ${res.status})` : (bodyText || res.statusText);
-    console.error('API error response:', { status: res.status, body: bodyText });
-    throw new Error(`HTTP ${res.status}: ${message}`);
+    const txt = await res.text();
+    let message = txt;
+    try {
+      const json = JSON.parse(txt);
+      if (json.message) message = json.message;
+    } catch (e) {}
+    throw new Error(message || res.statusText);
   }
-
-  if (res.status === 204 || !bodyText) return null;
-
+  
+  // Handle 204 No Content or empty responses
+  if (res.status === 204 || res.headers.get('content-length') === '0') {
+    return null;
+  }
+  
+  const contentType = res.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    return res.json();
+  }
+  
+  // Try to parse as JSON anyway
+  const txt = await res.text();
+  if (!txt) return null;
+  
   try {
-    return JSON.parse(bodyText);
+    return JSON.parse(txt);
   } catch (e) {
-    return bodyText;
+    return txt;
   }
 }
 
 export async function getPosts() {
-  const url = API_BASE;
-  console.debug('getPosts ->', url);
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(BASE);
   return handleResponse(res);
 }
 
 export async function createPost(payload) {
-  const url = API_BASE;
-  console.debug('createPost ->', url, payload);
-  const res = await fetch(url, {
+  const res = await fetch(BASE, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   return handleResponse(res);
 }
 
 export async function updatePost(id, payload) {
-  if (id == null) throw new Error('updatePost called with undefined id');
-  const url = `${API_BASE}/${encodeURIComponent(id)}`;
-  console.debug('updatePost ->', url, payload);
-  const res = await fetch(url, {
+  const res = await fetch(`${BASE}/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   return handleResponse(res);
 }
 
 export async function deletePost(id) {
-  if (id == null) throw new Error('deletePost called with undefined id');
-  const url = `${API_BASE}/${encodeURIComponent(id)}`;
-  console.debug('deletePost ->', url);
-  const res = await fetch(url, {
+  const res = await fetch(`${BASE}/${id}`, {
     method: 'DELETE',
-    headers: { Accept: 'application/json' },
   });
-  return handleResponse(res);
+  if (!res.ok) throw new Error('Delete failed');
+  return true;
 }
