@@ -4,7 +4,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'https://facebook-ui-ynk4.onrender.com',
         changeOrigin: true,
         secure: false,
       },
