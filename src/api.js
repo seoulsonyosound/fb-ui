@@ -1,4 +1,8 @@
-const BASE_URL = 'https://facebook-api-rkip.onrender.com/api/posts'
+let BASE =
+  import.meta.env.VITE_API_BASE ||
+  (import.meta.env.DEV
+    ? '/api/posts'
+    : 'https://facebook-ui-ynk4.onrender.com/api/posts');
 
 async function handleResponse(res) {
   if (!res.ok) {
