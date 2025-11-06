@@ -1,60 +1,65 @@
-// Centralized API helper — tolerates empty/non-JSON responses and exports CRUD helpers
-const API_BASE = process.env.REACT_APP_API_URL || '/api';
-
-async function parseResponse(res) {
-  // Safely read text and parse JSON only when appropriate
-  const text = await res.text().catch(() => '');
-  const contentType = res.headers.get('content-type') || '';
-  const isJson = text && contentType.includes('application/json');
-  const data = isJson ? JSON.parse(text) : (text ? text : null);
-  return { ok: res.ok, status: res.status, data, text };
-}
+const BASE_URL = import.meta.env.VITE_API_BASE || '';
+const BASE = BASE_URL ? `${BASE_URL}/api/posts` : '/api/posts';
 
 async function handleResponse(res) {
-  const { ok, status, data, text } = await parseResponse(res);
-  if (!ok) {
-    const message = (data && typeof data === 'object' && data.message) ? data.message : (typeof data === 'string' ? data : res.statusText);
-    const err = new Error(message || `HTTP ${status}`);
-    err.status = status;
-    err.body = data ?? text;
-    throw err;
+  if (!res.ok) {
+    const txt = await res.text();
+    let message = txt;
+    try {
+      const json = JSON.parse(txt);
+      if (json.message) message = json.message;
+    } catch (e) {}
+    throw new Error(message || res.statusText);
   }
-  return data;
+  
+  // Handle 204 No Content or empty responses
+  if (res.status === 204 || res.headers.get('content-length') === '0') {
+    return null;
+  }
+  
+  const contentType = res.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    return res.json();
+  }
+  
+  // Try to parse as JSON anyway
+  const txt = await res.text();
+  if (!txt) return null;
+  
+  try {
+    return JSON.parse(txt);
+  } catch (e) {
+    return txt;
+  }
 }
 
 export async function getPosts() {
-  const res = await fetch(`${API_BASE}/posts`, { method: 'GET' });
+  const res = await fetch(BASE);
   return handleResponse(res);
 }
 
-export async function createPost(post) {
-  const res = await fetch(`${API_BASE}/posts`, {
+export async function createPost(payload) {
+  const res = await fetch(BASE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(post),
+    body: JSON.stringify(payload),
   });
-  // Backend might return created resource or an empty body — handle both
   return handleResponse(res);
 }
 
-export async function updatePost(id, post) {
-  // Use PUT by default; change to PATCH if your backend expects partial updates
-  const res = await fetch(`${API_BASE}/posts/${encodeURIComponent(id)}`, {
+export async function updatePost(id, payload) {
+  const res = await fetch(`${BASE}/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(post),
+    body: JSON.stringify(payload),
   });
   return handleResponse(res);
 }
 
 export async function deletePost(id) {
-  const res = await fetch(`${API_BASE}/posts/${encodeURIComponent(id)}`, {
+  const res = await fetch(`${BASE}/${id}`, {
     method: 'DELETE',
   });
-  // Some APIs return empty body on delete — handle gracefully
-  return handleResponse(res).catch(err => {
-    // if backend returns 204 No Content, handleResponse may throw when parsing — allow a successful delete
-    if (err.status === 204) return null;
-    throw err;
-  });
+  if (!res.ok) throw new Error('Delete failed');
+  return true;
 }

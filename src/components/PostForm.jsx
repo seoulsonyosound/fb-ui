@@ -1,53 +1,94 @@
-// src/components/PostForm.jsx
-import React, { useState } from 'react';
-import { createPost } from '../api';
+import React, { useEffect, useState } from 'react';
 
-export default function PostForm({ onCreated }) {
-  const [author, setAuthor] = useState('');
-  const [content, setContent] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+const EMPTY = { author: '', content: '', imageUrl: '' };
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      const payload = { author, content, imageUrl };
-      const created = await createPost(payload);
-      if (onCreated) onCreated(created);
-      setAuthor('');
-      setContent('');
-      setImageUrl('');
-    } catch (err) {
-      console.error('Save failed', err);
-      setError(err.message || 'Save failed');
-    } finally {
-      setLoading(false);
+export default function PostForm({ initialData = null, onSave, onCancel }) {
+  const [form, setForm] = useState(EMPTY);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (initialData) {
+      setForm({
+        author: initialData.author || '',
+        content: initialData.content || '',
+        imageUrl: initialData.imageUrl || '',
+      });
+      setErr('');
+    } else {
+      setForm(EMPTY);
     }
-  }
+  }, [initialData]);
+
+  const validate = () => {
+    if (!form.author.trim()) return 'Author is required';
+    if (!form.content.trim()) return 'Content is required';
+    if (form.author.length > 200) return 'Author max 200 chars';
+    if (form.content.length > 5000) return 'Content max 5000 chars';
+    if (form.imageUrl && form.imageUrl.length > 2048) return 'Image URL too long';
+    return '';
+  };
+
+  const submit = async (e) => {
+    e && e.preventDefault();
+    const v = validate();
+    if (v) {
+      setErr(v);
+      return;
+    }
+    setSaving(true);
+    setErr('');
+    const payload = {
+      author: form.author.trim(),
+      content: form.content.trim(),
+      imageUrl: form.imageUrl?.trim() || null,
+    };
+    try {
+      const ok = await onSave(payload);
+      if (ok) {
+        setForm(EMPTY);
+      } else {
+        setErr('Save failed');
+      }
+    } catch (e) {
+      setErr(e.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <form onSubmit={handleSubmit} aria-label="Create post form">
-      {error && <div className="alert alert-danger">{error}</div>}
-
-      <div className="form-group">
-        <label htmlFor="post-author">Author</label>
-        <input id="post-author" className="form-control" value={author} onChange={e => setAuthor(e.target.value)} />
+    <form className="post-form" onSubmit={submit}>
+      {err && <div className="error">{err}</div>}
+      <div className="field">
+        <label>Author</label>
+        <input
+          value={form.author}
+          onChange={(e) => setForm({ ...form, author: e.target.value })}
+        />
       </div>
 
-      <div className="form-group">
-        <label htmlFor="post-content">Content</label>
-        <textarea id="post-content" className="form-control" value={content} onChange={e => setContent(e.target.value)} />
+      <div className="field">
+        <label>Content</label>
+        <textarea
+          rows={5}
+          value={form.content}
+          onChange={(e) => setForm({ ...form, content: e.target.value })}
+        />
       </div>
 
-      <div className="form-group">
-        <label htmlFor="post-image">Image URL (optional)</label>
-        <input id="post-image" className="form-control" value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
+      <div className="field">
+        <label>Image URL (optional)</label>
+        <input
+          value={form.imageUrl}
+          onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+        />
       </div>
 
-      <button type="submit" className="btn btn-primary" disabled={loading}>Save</button>
+      <div className="actions">
+        <button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+        {onCancel && <button type="button" onClick={onCancel}>Cancel</button>}
+      </div>
     </form>
   );
 }
