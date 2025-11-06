@@ -1,5 +1,12 @@
-const BASE_URL = import.meta.env.VITE_API_BASE || '';
-const BASE = BASE_URL ? `${BASE_URL}/api/posts` : '/api/posts';
+const rawBase = import.meta.env.VITE_API_BASE || '';
+// normalize: remove trailing slash if present
+const baseRoot = rawBase.replace(/\/$/, '');
+// If you set VITE_API_BASE, it should be the backend origin (e.g. https://my-backend.onrender.com)
+// Do NOT include the /api/posts suffix in the env var — this file will add /api/posts.
+const BASE = baseRoot ? `${baseRoot}/api/posts` : '/api/posts';
+
+// quick runtime logging to confirm what URL is actually used (remove or lower log level in prod)
+console.debug('apiService: using BASE =', BASE);
 
 async function handleResponse(res) {
   if (!res.ok) {
@@ -11,25 +18,25 @@ async function handleResponse(res) {
     } catch (e) {}
     throw new Error(message || res.statusText);
   }
-  
+
   // Handle 204 No Content or empty responses
   if (res.status === 204 || res.headers.get('content-length') === '0') {
     return null;
   }
-  
+
   const contentType = res.headers.get('content-type');
   if (contentType && contentType.includes('application/json')) {
     return res.json();
   }
-  
+
   // Try to parse as JSON anyway
-  const txt = await res.text();
-  if (!txt) return null;
-  
+  const text = await res.text();
+  if (!text) return null;
+
   try {
-    return JSON.parse(txt);
+    return JSON.parse(text);
   } catch (e) {
-    return txt;
+    return text;
   }
 }
 
