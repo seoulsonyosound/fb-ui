@@ -1,51 +1,34 @@
-// The base URL for the API is read from Vite environment variable VITE_API_BASE.
-// In development you can set this in a local .env file (e.g. .env.local):
-// VITE_API_BASE=http://localhost:8080
-// In production (Render) set VITE_API_BASE to your Render service URL (no trailing slash),
-// e.g. https://your-api.onrender.com
-const BASE_URL = import.meta.env.VITE_API_BASE || '';
-const BASE = `${BASE_URL}/api/posts`.replace(/(?<!:)\/\//g, '/').replace('http:/', 'http://').replace('https:/', 'https://');
+// src/api.js
+// Centralized API helper that tolerates empty/non-JSON responses
+const API_BASE = process.env.REACT_APP_API_URL || '/api';
 
 async function handleResponse(res) {
+  // read body as text first
+  const text = await res.text().catch(() => '');
+  const contentType = res.headers.get('content-type') || '';
+
+  // try to parse JSON only if there's text and content-type indicates JSON
+  const data = text && contentType.includes('application/json') ? JSON.parse(text) : (text ? text : null);
+
   if (!res.ok) {
-    const txt = await res.text();
-    let message = txt;
-    try {
-      const json = JSON.parse(txt);
-      if (json.message) message = json.message;
-    } catch (e) {}
-    throw new Error(message || res.statusText);
+    // backend might return JSON error message or plain text
+    const message = (data && typeof data === 'object' && data.message) ? data.message : (typeof data === 'string' ? data : res.statusText);
+    throw new Error(message || `HTTP ${res.status}`);
   }
-  return res.json();
+
+  return data;
 }
 
 export async function getPosts() {
-  const res = await fetch(BASE);
+  const res = await fetch(`${API_BASE}/posts`, { method: 'GET' });
   return handleResponse(res);
 }
 
-export async function createPost(payload) {
-  const res = await fetch(BASE, {
+export async function createPost(post) {
+  const res = await fetch(`${API_BASE}/posts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(post),
   });
-  return handleResponse(res);
-}
-
-export async function updatePost(id, payload) {
-  const res = await fetch(`${BASE}/${id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  return handleResponse(res);
-}
-
-export async function deletePost(id) {
-  const res = await fetch(`${BASE}/${id}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) throw new Error('Delete failed');
-  return true;
+  return handleResponse(res); // will return parsed JSON, text, or null safely
 }

@@ -1,90 +1,49 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { createPost } from '../api';
 
-const EMPTY = { author: '', content: '', imageUrl: '' };
+export default function PostForm({ onCreated }) {
+  const [author, setAuthor] = useState('');
+  const [content, setContent] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-export default function PostForm({ initialData = null, onSave, onCancel }) {
-  const [form, setForm] = useState(EMPTY);
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState('');
-
-  useEffect(() => {
-    if (initialData) {
-      setForm({
-        author: initialData.author || '',
-        content: initialData.content || '',
-        imageUrl: initialData.imageUrl || '',
-      });
-      setErr('');
-    } else {
-      setForm(EMPTY);
-    }
-  }, [initialData]);
-
-  const validate = () => {
-    if (!form.author.trim()) return 'Author is required';
-    if (!form.content.trim()) return 'Content is required';
-    if (form.author.length > 200) return 'Author max 200 chars';
-    if (form.content.length > 5000) return 'Content max 5000 chars';
-    if (form.imageUrl && form.imageUrl.length > 2048) return 'Image URL too long';
-    return '';
-  };
-
-  const submit = async (e) => {
-    e && e.preventDefault();
-    const v = validate();
-    if (v) {
-      setErr(v);
-      return;
-    }
-    setSaving(true);
-    setErr('');
-    const payload = {
-      author: form.author.trim(),
-      content: form.content.trim(),
-      imageUrl: form.imageUrl?.trim() || null,
-    };
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
     try {
-      await onSave(payload);
-      setForm(EMPTY);
-    } catch (e) {
-      setErr(e.message || 'Save failed');
+      const payload = { author, content, imageUrl };
+      const created = await createPost(payload);
+      if (created && created.id) {
+        // backend returned created resource
+        onCreated(created);
+      } else {
+        // backend returned empty body: trigger a refresh or construct a minimal local object
+        // simplest: re-fetch in parent (signal parent to re-fetch)
+        onCreated(null); // parent can call getPosts() again
+      }
+      setAuthor('');
+      setContent('');
+      setImageUrl('');
+    } catch (err) {
+      console.error('Create failed', err);
+      setError(err.message || 'Create failed');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
-  };
+  }
 
   return (
-    <form className="post-form" onSubmit={submit}>
-      {err && <div className="error">{err}</div>}
-      <div className="field">
-        <label>Author</label>
-        <input
-          value={form.author}
-          onChange={(e) => setForm({ ...form, author: e.target.value })}
-        />
-      </div>
-
-      <div className="field">
-        <label>Content</label>
-        <textarea
-          rows={5}
-          value={form.content}
-          onChange={(e) => setForm({ ...form, content: e.target.value })}
-        />
-      </div>
-
-      <div className="field">
-        <label>Image URL (optional)</label>
-        <input
-          value={form.imageUrl}
-          onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-        />
-      </div>
-
-      <div className="actions">
-        <button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
-        {onCancel && <button type="button" onClick={onCancel}>Cancel</button>}
-      </div>
+    <form onSubmit={handleSubmit}>
+      {error && <div className="alert alert-danger">{error}</div>}
+      <label htmlFor="post-author">Author</label>
+      <input id="post-author" value={author} onChange={e => setAuthor(e.target.value)} />
+      <label htmlFor="post-content">Content</label>
+      <textarea id="post-content" value={content} onChange={e => setContent(e.target.value)} />
+      <label htmlFor="post-image">Image URL</label>
+      <input id="post-image" value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
+      <button type="submit" disabled={loading}>Save</button>
     </form>
   );
 }
