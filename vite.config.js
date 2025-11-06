@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://facebook-ui-ynk4.onrender.com',
+        target: 'https://facebook-api-8hnv.onrender.com',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path,
