@@ -1,5 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_BASE || '';
-const BASE = BASE_URL ? `${BASE_URL}/api/posts` : '/api/posts';
+const BASE_URL = import.meta.env.VITE_API_BASE;
 
 async function handleResponse(res) {
   if (!res.ok) {
