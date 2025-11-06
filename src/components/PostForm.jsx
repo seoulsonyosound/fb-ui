@@ -44,12 +44,8 @@ export default function PostForm({ initialData = null, onSave, onCancel }) {
       imageUrl: form.imageUrl?.trim() || null,
     };
     try {
-      const ok = await onSave(payload);
-      if (ok) {
-        setForm(EMPTY);
-      } else {
-        setErr('Save failed');
-      }
+      await onSave(payload);
+      setForm(EMPTY);
     } catch (e) {
       setErr(e.message || 'Save failed');
     } finally {

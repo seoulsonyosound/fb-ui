@@ -1,8 +1,10 @@
-let BASE =
-  import.meta.env.VITE_API_BASE ||
-  (import.meta.env.DEV
-    ? '/api/posts'
-    : 'https://facebook-ui-ynk4.onrender.com/api/posts');
+// The base URL for the API is read from Vite environment variable VITE_API_BASE.
+// In development you can set this in a local .env file (e.g. .env.local):
+// VITE_API_BASE=http://localhost:8080
+// In production (Render) set VITE_API_BASE to your Render service URL (no trailing slash),
+// e.g. https://your-api.onrender.com
+const BASE_URL = import.meta.env.VITE_API_BASE || '';
+const BASE = `${BASE_URL}/api/posts`.replace(/(?<!:)\/\//g, '/').replace('http:/', 'http://').replace('https:/', 'https://');
 
 async function handleResponse(res) {
   if (!res.ok) {
@@ -14,26 +16,7 @@ async function handleResponse(res) {
     } catch (e) {}
     throw new Error(message || res.statusText);
   }
-  
-  // Handle 204 No Content or empty responses
-  if (res.status === 204 || res.headers.get('content-length') === '0') {
-    return null;
-  }
-  
-  const contentType = res.headers.get('content-type');
-  if (contentType && contentType.includes('application/json')) {
-    return res.json();
-  }
-  
-  // Try to parse as JSON anyway
-  const txt = await res.text();
-  if (!txt) return null;
-  
-  try {
-    return JSON.parse(txt);
-  } catch (e) {
-    return txt;
-  }
+  return res.json();
 }
 
 export async function getPosts() {
